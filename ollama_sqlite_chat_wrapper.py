@@ -134,10 +134,21 @@ class ChatStore:
     def list_conversations(self) -> List[sqlite3.Row]:
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT id, name, created_at FROM conversations ORDER BY id ASC"
+                """
+                SELECT
+                    conversations.id,
+                    conversations.name,
+                    conversations.created_at,
+                    MAX(messages.created_at) AS last_used_at
+                FROM conversations
+                LEFT JOIN messages
+                    ON conversations.id = messages.conversation_id
+                GROUP BY conversations.id, conversations.name, conversations.created_at
+                ORDER BY COALESCE(last_used_at, conversations.created_at) DESC
+                """
             ).fetchall()
         return list(rows)
-
+    
     def delete_conversation(self, conversation_id: int) -> None:
         with self._connect() as conn:
             conn.execute(
@@ -240,7 +251,8 @@ def choose_conversation(store: ChatStore, current_model: Optional[str]) -> str:
         if rows:
             print("\nExisting conversations:")
             for index, row in enumerate(rows, start=1):
-                print(f"  {index}. {row['name']}")
+                last_used = row["last_used_at"] or row["created_at"]
+                print(f"  {index}. {row['name']} (last used: {last_used})")
         else:
             print("No conversations yet.")
 
