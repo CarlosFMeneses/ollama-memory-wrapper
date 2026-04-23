@@ -267,10 +267,10 @@ def choose_conversation(store: ChatStore) -> str:
 
             row = rows[delete_index]
             confirm = input(
-                f"Type DELETE to permanently remove '{row['name']}': "
-            ).strip()
+                f"Delete '{row['name']}'? (y/n): "
+            ).strip().lower()
 
-            if confirm == "DELETE":
+            if confirm == "y":
                 store.delete_conversation(int(row["id"]))
                 print(f"Conversation '{row['name']}' deleted.")
             else:
@@ -329,10 +329,10 @@ def main() -> None:
                 continue
 
             confirm = input(
-                f"Type DELETE to remove the current conversation '{conversation_name}': "
-            ).strip()
+                f"Delete '{conversation_name}'? (y/n): "
+            ).strip().lower()
 
-            if confirm == "DELETE":
+            if confirm == "y":
                 store.delete_conversation(current_id)
                 print(f"\nConversation '{conversation_name}' deleted.")
                 conversation_name = choose_conversation(store)
