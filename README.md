@@ -99,6 +99,8 @@ This project was developed and tested on the following configuration:
 - [ ] Keyword search across conversation history
 - [ ] Per-model conversation memory scoping to prevent cross-model memory conflicts
 - [ ] Migration to Letta/MemGPT architecture
+- [ ] Web interface for browser-based interaction
+- [ ] macOS/iOS native app with local LLM inference and memory management
 
 ## License
 
