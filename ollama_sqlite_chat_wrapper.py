@@ -240,6 +240,36 @@ def choose_model(client: OllamaClient) -> str:
 
         print("That number is out of range.")
 
+def format_time_ago(timestamp: str) -> str:
+    try:
+        dt = datetime.fromisoformat(timestamp)
+    except Exception:
+        return timestamp  # fallback if parsing fails
+
+    now = datetime.now()
+    delta = now - dt
+
+    seconds = int(delta.total_seconds())
+
+    if seconds < 60:
+        return "just now"
+
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes} min ago" if minutes == 1 else f"{minutes} mins ago"
+
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours} hr ago" if hours == 1 else f"{hours} hrs ago"
+
+    days = hours // 24
+    if days == 1:
+        return "yesterday"
+    if days < 7:
+        return f"{days} days ago"
+
+    # fallback: show date
+    return dt.strftime("%Y-%m-%d")
 
 def choose_conversation(store: ChatStore, current_model: Optional[str]) -> str:
     while True:
@@ -252,7 +282,8 @@ def choose_conversation(store: ChatStore, current_model: Optional[str]) -> str:
             print("\nExisting conversations:")
             for index, row in enumerate(rows, start=1):
                 last_used = row["last_used_at"] or row["created_at"]
-                print(f"  {index}. {row['name']} (last used: {last_used})")
+                pretty_time = format_time_ago(last_used)
+                print(f"  {index}. {row['name']} (last used: {pretty_time})")
         else:
             print("No conversations yet.")
 
