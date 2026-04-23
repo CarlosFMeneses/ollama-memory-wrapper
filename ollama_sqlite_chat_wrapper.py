@@ -23,14 +23,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "chat_memory.db"
-OLLAMA_URL = "http://localhost:11434/api/chat"
+OLLAMA_CHAT_URL = "http://localhost:11434/api/chat"
+OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
 MAX_CONTEXT_MESSAGES = 20
+SYSTEM_PROMPT = "You are a helpful local AI assistant. Be clear, practical, and concise."
 
 
 class ChatStore:
@@ -85,6 +87,17 @@ class ChatStore:
             conn.commit()
             return int(cursor.lastrowid)
 
+    def get_conversation_id_by_name(self, name: str) -> Optional[int]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM conversations WHERE name = ?",
+                (name,),
+            ).fetchone()
+
+        if row:
+            return int(row["id"])
+        return None
+
     def save_message(self, conversation_id: int, role: str, content: str) -> None:
         with self._connect() as conn:
             conn.execute(
@@ -96,7 +109,11 @@ class ChatStore:
             )
             conn.commit()
 
-    def load_recent_messages(self, conversation_id: int, limit: int = MAX_CONTEXT_MESSAGES) -> List[Dict[str, str]]:
+    def load_recent_messages(
+        self,
+        conversation_id: int,
+        limit: int = MAX_CONTEXT_MESSAGES,
+    ) -> List[Dict[str, str]]:
         with self._connect() as conn:
             rows = conn.execute(
                 """
@@ -109,7 +126,6 @@ class ChatStore:
                 (conversation_id, limit),
             ).fetchall()
 
-        # Reverse because we selected newest first but Ollama expects oldest -> newest
         rows = list(reversed(rows))
         return [{"role": row["role"], "content": row["content"]} for row in rows]
 
@@ -120,14 +136,26 @@ class ChatStore:
             ).fetchall()
         return list(rows)
 
+    def delete_conversation(self, conversation_id: int) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM messages WHERE conversation_id = ?",
+                (conversation_id,),
+            )
+            conn.execute(
+                "DELETE FROM conversations WHERE id = ?",
+                (conversation_id,),
+            )
+            conn.commit()
+
 
 class OllamaClient:
-    def __init__(self, base_url: str = OLLAMA_URL, model: Optional[str] = None) -> None:
-        self.base_url = base_url
+    def __init__(self, chat_url: str = OLLAMA_CHAT_URL, model: Optional[str] = None) -> None:
+        self.chat_url = chat_url
         self.model = model
 
     def list_models(self) -> List[str]:
-        response = requests.get("http://localhost:11434/api/tags", timeout=30)
+        response = requests.get(OLLAMA_TAGS_URL, timeout=30)
         response.raise_for_status()
         data = response.json()
         return [model["name"] for model in data.get("models", [])]
@@ -142,7 +170,7 @@ class OllamaClient:
             "stream": False,
         }
 
-        response = requests.post(self.base_url, json=payload, timeout=120)
+        response = requests.post(self.chat_url, json=payload, timeout=120)
         response.raise_for_status()
         data = response.json()
         return data["message"]["content"]
@@ -158,14 +186,7 @@ class PersistentChatApp:
         if messages:
             return
 
-        self.store.save_message(
-            conversation_id,
-            "system",
-            (
-                "You are a helpful local AI assistant. "
-                "Be clear, practical, and concise."
-            ),
-        )
+        self.store.save_message(conversation_id, "system", SYSTEM_PROMPT)
 
     def ask(self, conversation_name: str, user_text: str) -> str:
         conversation_id = self.store.get_or_create_conversation(conversation_name)
@@ -179,27 +200,13 @@ class PersistentChatApp:
         return assistant_text
 
 
-def choose_conversation(store: ChatStore) -> str:
-    rows = store.list_conversations()
-
-    if rows:
-        print("Existing conversations:")
-        for row in rows:
-            print(f"  - {row['name']}")
-    else:
-        print("No conversations yet.")
-
-    name = input("\nEnter a conversation name (example: default, coding, resume): ").strip()
-    return name or "default"
-
-
 def choose_model(client: OllamaClient) -> str:
     models = client.list_models()
 
     if not models:
         raise RuntimeError("No Ollama models are installed.")
 
-    print("Installed Ollama models:")
+    print("\nInstalled Ollama models:")
     for index, model_name in enumerate(models, start=1):
         print(f"  {index}. {model_name}")
 
@@ -217,14 +224,78 @@ def choose_model(client: OllamaClient) -> str:
         print("That number is out of range.")
 
 
+def choose_conversation(store: ChatStore) -> str:
+    while True:
+        rows = store.list_conversations()
+
+        print("\nConversation Manager")
+        if rows:
+            print("Existing conversations:")
+            for index, row in enumerate(rows, start=1):
+                print(f"  {index}. {row['name']}")
+        else:
+            print("No conversations yet.")
+
+        print("\nOptions:")
+        print("  [number] Open a conversation")
+        print("  n        Start a new conversation")
+        print("  d        Delete a conversation")
+
+        choice = input("\nChoose an option: ").strip().lower()
+
+        if choice == "n":
+            name = input("Enter a new conversation name: ").strip()
+            if name:
+                return name
+            print("Conversation name cannot be empty.")
+            continue
+
+        if choice == "d":
+            if not rows:
+                print("There are no conversations to delete.")
+                continue
+
+            delete_choice = input("Enter the number of the conversation to delete: ").strip()
+            if not delete_choice.isdigit():
+                print("Please enter a valid number.")
+                continue
+
+            delete_index = int(delete_choice) - 1
+            if not (0 <= delete_index < len(rows)):
+                print("That number is out of range.")
+                continue
+
+            row = rows[delete_index]
+            confirm = input(
+                f"Type DELETE to permanently remove '{row['name']}': "
+            ).strip()
+
+            if confirm == "DELETE":
+                store.delete_conversation(int(row["id"]))
+                print(f"Conversation '{row['name']}' deleted.")
+            else:
+                print("Delete cancelled.")
+            continue
+
+        if choice.isdigit():
+            selected_index = int(choice) - 1
+            if 0 <= selected_index < len(rows):
+                return str(rows[selected_index]["name"])
+            print("That number is out of range.")
+            continue
+
+        print("Invalid option. Please choose a number, n, or d.")
+
+
 def main() -> None:
     store = ChatStore(DB_PATH)
     client = OllamaClient()
 
     print("Persistent Ollama Chat")
     print("Type /exit to quit")
-    print("Type /new to switch conversations")
-    print("Type /model to switch models\n")
+    print("Type /new to open or create a conversation")
+    print("Type /delete to delete the current conversation")
+    print("Type /model to switch models")
 
     try:
         selected_model = choose_model(client)
@@ -248,6 +319,25 @@ def main() -> None:
 
         if user_text == "/new":
             conversation_name = choose_conversation(store)
+            continue
+
+        if user_text == "/delete":
+            current_id = store.get_conversation_id_by_name(conversation_name)
+            if current_id is None:
+                print("\nThat conversation does not exist.")
+                conversation_name = choose_conversation(store)
+                continue
+
+            confirm = input(
+                f"Type DELETE to remove the current conversation '{conversation_name}': "
+            ).strip()
+
+            if confirm == "DELETE":
+                store.delete_conversation(current_id)
+                print(f"\nConversation '{conversation_name}' deleted.")
+                conversation_name = choose_conversation(store)
+            else:
+                print("\nDelete cancelled.")
             continue
 
         if user_text == "/model":
