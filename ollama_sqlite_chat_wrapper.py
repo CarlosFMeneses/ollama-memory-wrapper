@@ -323,15 +323,18 @@ def pick_conversation_or_model(store: ChatStore, client: OllamaClient) -> str:
         return choice
 
 
+def show_chat_commands() -> None:
+    print("\nChat commands:")
+    print("  /new     open or create a conversation")
+    print("  /delete  delete the current conversation")
+    print("  /model   switch models")
+    print("  /exit    quit")
+
 def main() -> None:
     store = ChatStore(DB_PATH)
     client = OllamaClient()
 
     print("Persistent Ollama Chat")
-    print("Type /exit to quit")
-    print("Type /new to open or create a conversation")
-    print("Type /delete to delete the current conversation")
-    print("Type /model to switch models")
 
     try:
         selected_model = choose_model(client)
@@ -346,14 +349,16 @@ def main() -> None:
         return
 
     app = PersistentChatApp(store, client)
-    conversation_name = pick_conversation_or_model(store, client)
+    conversation_name = pick_conversation_or_model(store, client)    
 
     if conversation_name == EXIT_SENTINEL:
         print("Goodbye.")
         return
 
+    show_chat_commands()
+
     while True:
-        user_text = input(f"\n[{conversation_name}] You: ").strip()
+        user_text = input(f"\n{client.model}.{conversation_name}->You: ").strip()
 
         if not user_text:
             continue
@@ -367,6 +372,7 @@ def main() -> None:
             if conversation_name == EXIT_SENTINEL:
                 print("Goodbye.")
                 break
+            show_chat_commands()            
             continue
 
         if user_text == "/delete":
@@ -377,6 +383,7 @@ def main() -> None:
                 if conversation_name == EXIT_SENTINEL:
                     print("Goodbye.")
                     break
+                show_chat_commands()
                 continue
 
             confirm = input(
