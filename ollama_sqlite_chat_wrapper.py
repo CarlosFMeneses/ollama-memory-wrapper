@@ -34,6 +34,7 @@ OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
 MAX_CONTEXT_MESSAGES = 20
 SYSTEM_PROMPT = "You are a helpful local AI assistant. Be clear, practical, and concise."
 MODEL_MENU_SENTINEL = "__MODEL_MENU__"
+EXIT_SENTINEL = "__EXIT__"
 
 
 class ChatStore:
@@ -210,12 +211,16 @@ def choose_model(client: OllamaClient) -> str:
     print("\nInstalled Ollama models:")
     for index, model_name in enumerate(models, start=1):
         print(f"  {index}. {model_name}")
+    print("  x. Exit")
 
     while True:
-        choice = input("\nPick a model by number: ").strip()
+        choice = input("\nPick a model by number or x to exit: ").strip().lower()
+
+        if choice == "x":
+            return EXIT_SENTINEL
 
         if not choice.isdigit():
-            print("Please enter a number.")
+            print("Please enter a number or x.")
             continue
 
         selected_index = int(choice) - 1
@@ -242,6 +247,7 @@ def choose_conversation(store: ChatStore) -> str:
         print("  n        Start a new conversation")
         print("  d        Delete a conversation")
         print("  m        Back to model selection")
+        print("  x        Exit")
 
         choice = input("\nChoose an option: ").strip().lower()
 
@@ -254,6 +260,9 @@ def choose_conversation(store: ChatStore) -> str:
 
         if choice == "m":
             return MODEL_MENU_SENTINEL
+
+        if choice == "x":
+            return EXIT_SENTINEL
 
         if choice == "d":
             if not rows:
@@ -289,7 +298,7 @@ def choose_conversation(store: ChatStore) -> str:
             print("That number is out of range.")
             continue
 
-        print("Invalid option. Please choose a number, n, d, or m.")
+        print("Invalid option. Please choose a number, n, d, m, or x.")
 
 
 def pick_conversation_or_model(store: ChatStore, client: OllamaClient) -> str:
@@ -299,6 +308,10 @@ def pick_conversation_or_model(store: ChatStore, client: OllamaClient) -> str:
         if choice == MODEL_MENU_SENTINEL:
             try:
                 selected_model = choose_model(client)
+
+                if selected_model == EXIT_SENTINEL:
+                    return EXIT_SENTINEL
+
                 client.model = selected_model
                 print(f"\nSwitched to model: {selected_model}")
             except Exception as exc:
@@ -320,6 +333,11 @@ def main() -> None:
 
     try:
         selected_model = choose_model(client)
+
+        if selected_model == EXIT_SENTINEL:
+            print("Goodbye.")
+            return
+
         client.model = selected_model
     except Exception as exc:
         print(f"Error selecting model: {exc}")
@@ -327,6 +345,10 @@ def main() -> None:
 
     app = PersistentChatApp(store, client)
     conversation_name = pick_conversation_or_model(store, client)
+
+    if conversation_name == EXIT_SENTINEL:
+        print("Goodbye.")
+        return
 
     while True:
         user_text = input(f"\n[{conversation_name}] You: ").strip()
@@ -340,6 +362,9 @@ def main() -> None:
 
         if user_text == "/new":
             conversation_name = pick_conversation_or_model(store, client)
+            if conversation_name == EXIT_SENTINEL:
+                print("Goodbye.")
+                break
             continue
 
         if user_text == "/delete":
@@ -347,6 +372,9 @@ def main() -> None:
             if current_id is None:
                 print("\nThat conversation does not exist.")
                 conversation_name = pick_conversation_or_model(store, client)
+                if conversation_name == EXIT_SENTINEL:
+                    print("Goodbye.")
+                    break
                 continue
 
             confirm = input(
@@ -357,6 +385,9 @@ def main() -> None:
                 store.delete_conversation(current_id)
                 print(f"\nConversation '{conversation_name}' deleted.")
                 conversation_name = pick_conversation_or_model(store, client)
+                if conversation_name == EXIT_SENTINEL:
+                    print("Goodbye.")
+                    break
             else:
                 print("\nDelete cancelled.")
             continue
@@ -364,6 +395,11 @@ def main() -> None:
         if user_text == "/model":
             try:
                 selected_model = choose_model(client)
+
+                if selected_model == EXIT_SENTINEL:
+                    print("Goodbye.")
+                    break
+
                 client.model = selected_model
                 print(f"\nSwitched to model: {selected_model}")
             except Exception as exc:
