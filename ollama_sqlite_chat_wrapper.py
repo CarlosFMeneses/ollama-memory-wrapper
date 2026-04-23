@@ -230,13 +230,15 @@ def choose_model(client: OllamaClient) -> str:
         print("That number is out of range.")
 
 
-def choose_conversation(store: ChatStore) -> str:
+def choose_conversation(store: ChatStore, current_model: Optional[str]) -> str:
     while True:
         rows = store.list_conversations()
 
-        print("\nConversation Manager")
+        print(f"\nCurrent model: {current_model or 'None'}")
+        print("Conversation Manager")
+
         if rows:
-            print("Existing conversations:")
+            print("\nExisting conversations:")
             for index, row in enumerate(rows, start=1):
                 print(f"  {index}. {row['name']}")
         else:
@@ -303,7 +305,7 @@ def choose_conversation(store: ChatStore) -> str:
 
 def pick_conversation_or_model(store: ChatStore, client: OllamaClient) -> str:
     while True:
-        choice = choose_conversation(store)
+        choice = choose_conversation(store, client.model)
 
         if choice == MODEL_MENU_SENTINEL:
             try:
