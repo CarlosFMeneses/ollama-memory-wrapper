@@ -58,3 +58,23 @@ then open or create a named conversation.
 | `/exit` | Quit the application |
 
 ## Project Structure
+
+    ollama-memory-wrapper/
+    ├── ollama_sqlite_chat_wrapper.py  # Main application
+    ├── chat_memory.db                 # SQLite database (auto-created, git-ignored)
+    ├── README.md
+    ├── LICENSE
+    └── .gitignore
+
+## Roadmap
+
+- [ ] Long-term memory table for summarized knowledge
+- [ ] Keyword search across conversation history
+- [ ] Migration to Letta/MemGPT architecture
+
+## License
+
+Copyright (C) 2026 Carlos F. Meneses
+
+This project is licensed under the GNU General Public License v3.0.
+See [LICENSE](LICENSE) for details.
