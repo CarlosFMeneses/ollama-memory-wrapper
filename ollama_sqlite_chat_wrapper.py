@@ -33,6 +33,7 @@ OLLAMA_CHAT_URL = "http://localhost:11434/api/chat"
 OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
 MAX_CONTEXT_MESSAGES = 20
 SYSTEM_PROMPT = "You are a helpful local AI assistant. Be clear, practical, and concise."
+MODEL_MENU_SENTINEL = "__MODEL_MENU__"
 
 
 class ChatStore:
@@ -240,6 +241,7 @@ def choose_conversation(store: ChatStore) -> str:
         print("  [number] Open a conversation")
         print("  n        Start a new conversation")
         print("  d        Delete a conversation")
+        print("  m        Back to model selection")
 
         choice = input("\nChoose an option: ").strip().lower()
 
@@ -249,6 +251,9 @@ def choose_conversation(store: ChatStore) -> str:
                 return name
             print("Conversation name cannot be empty.")
             continue
+
+        if choice == "m":
+            return MODEL_MENU_SENTINEL
 
         if choice == "d":
             if not rows:
@@ -284,7 +289,23 @@ def choose_conversation(store: ChatStore) -> str:
             print("That number is out of range.")
             continue
 
-        print("Invalid option. Please choose a number, n, or d.")
+        print("Invalid option. Please choose a number, n, d, or m.")
+
+
+def pick_conversation_or_model(store: ChatStore, client: OllamaClient) -> str:
+    while True:
+        choice = choose_conversation(store)
+
+        if choice == MODEL_MENU_SENTINEL:
+            try:
+                selected_model = choose_model(client)
+                client.model = selected_model
+                print(f"\nSwitched to model: {selected_model}")
+            except Exception as exc:
+                print(f"\nError selecting model: {exc}")
+            continue
+
+        return choice
 
 
 def main() -> None:
@@ -305,7 +326,7 @@ def main() -> None:
         return
 
     app = PersistentChatApp(store, client)
-    conversation_name = choose_conversation(store)
+    conversation_name = pick_conversation_or_model(store, client)
 
     while True:
         user_text = input(f"\n[{conversation_name}] You: ").strip()
@@ -318,14 +339,14 @@ def main() -> None:
             break
 
         if user_text == "/new":
-            conversation_name = choose_conversation(store)
+            conversation_name = pick_conversation_or_model(store, client)
             continue
 
         if user_text == "/delete":
             current_id = store.get_conversation_id_by_name(conversation_name)
             if current_id is None:
                 print("\nThat conversation does not exist.")
-                conversation_name = choose_conversation(store)
+                conversation_name = pick_conversation_or_model(store, client)
                 continue
 
             confirm = input(
@@ -335,7 +356,7 @@ def main() -> None:
             if confirm == "y":
                 store.delete_conversation(current_id)
                 print(f"\nConversation '{conversation_name}' deleted.")
-                conversation_name = choose_conversation(store)
+                conversation_name = pick_conversation_or_model(store, client)
             else:
                 print("\nDelete cancelled.")
             continue
