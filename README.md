@@ -1,12 +1,9 @@
+**Author:** Carlos F. Meneses  
+**Year:** 2026
+
 # Ollama SQLite Chat Wrapper
 
-**Author:** Carlos F. Meneses
-**Year:** 2026
-**License:** GNU General Public License v3.0
-
-A CLI-based local AI assistant powered by Ollama, featuring 
-SQLite-backed persistent conversation memory and dynamic model 
-selection.
+A CLI-based local AI assistant powered by Ollama, featuring SQLite-backed persistent conversation memory and dynamic model selection.
 
 ## Features
 
@@ -45,7 +42,7 @@ pip install requests
 python ollama_sqlite_chat_wrapper.py
 ```
 
-On launch you will be prompted to select an installed Ollama model, 
+On launch you will be prompted to select an installed Ollama model,
 then open or create a named conversation.
 
 ## Chat Commands
@@ -56,6 +53,36 @@ then open or create a named conversation.
 | `/delete` | Delete current conversation |
 | `/model` | Switch to a different model |
 | `/exit` | Quit the application |
+
+## Environment
+
+This project was developed and tested on the following configuration:
+
+| Component | Details |
+|---|---|
+| **Hardware** | Apple iMac M2 |
+| **RAM** | 8GB Unified Memory |
+| **OS** | macOS |
+| **Package Manager** | Homebrew (brew) |
+| **Python** | 3.13.3 |
+| **Ollama** | 0.21.0 |
+| **Models Tested** | qwen2.5:3b, qwen2.5:7b |
+| **Model Storage** | External SSD |
+| **IDE** | Xcode, Terminal |
+
+> **Note:** Apple Silicon (M2) handles local LLM inference efficiently
+> due to unified memory architecture. Models were stored and run from
+> an external SSD. Performance may vary depending on storage type and
+> speed — an external SSD with fast read speeds is recommended for
+> smooth model loading. Both Python and Ollama were installed and
+> managed via Homebrew. Ollama must be running locally on
+> localhost:11434 before launching this application.
+>
+> **⚠️ Known Limitation:** This application uses a single shared
+> SQLite database for all models. Conversation memory is not
+> model-specific — retrieving memory across different models may
+> produce erratic or inconsistent behavior. A future improvement
+> would be to scope conversation memory per model. See Roadmap.
 
 ## Project Structure
 
@@ -70,6 +97,7 @@ then open or create a named conversation.
 
 - [ ] Long-term memory table for summarized knowledge
 - [ ] Keyword search across conversation history
+- [ ] Per-model conversation memory scoping to prevent cross-model memory conflicts
 - [ ] Migration to Letta/MemGPT architecture
 
 ## License
